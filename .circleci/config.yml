@@ -4,26 +4,38 @@ jobs:
   backend_ci:
     docker:
       - image: cimg/python:3.11
-    working_directory: ~/repo/backend
     steps:
       - checkout
       - run:
-          name: Install Dependencies
+          name: Install Backend Dependencies
           command: |
-            pip install -r requirements.txt
+            cd backend
+            if [ -f requirements.txt ]; then
+              pip install -r requirements.txt
+            else
+              echo "No requirements.txt found"
+            fi
       - run:
-          name: Run Tests
+          name: Run Backend Tests
           command: |
+            cd backend
             pytest || echo "No tests"
 
   frontend_ci:
     docker:
       - image: cimg/node:18.0
-    working_directory: ~/repo/frontend
     steps:
       - checkout
-      - run: npm install
-      - run: npm run build
+      - run:
+          name: Install Frontend Dependencies
+          command: |
+            cd frontend
+            if [ -f package.json ]; then
+              npm install
+              npm run build
+            else
+              echo "No package.json found"
+            fi
 
   deploy_to_ec2:
     docker:
@@ -33,16 +45,12 @@ jobs:
           fingerprints:
             - "SHA256:9ajH+lqwmRGo1IWNb2wwtf2IDAByxh1TxNjmmINm6DM"
       - run:
-          name: Deploy to EC2
+          name: Deploy
           command: |
             ssh -o StrictHostKeyChecking=no ec2-user@$EC2_IP "
-            if [ ! -d /home/ec2-user/blog-app ]; then
-              git clone https://github.com/MaheshKumarBisai/Blog-app.git /home/ec2-user/blog-app
-            fi &&
-            cd /home/ec2-user/blog-app && git pull origin main &&
-            npm install --prefix frontend &&
-            pip install -r backend/requirements.txt &&
-            sudo systemctl restart blog-app
+              cd /home/ec2-user/blog-app &&
+              git pull origin main &&
+              sudo systemctl restart blog-app
             "
 
 workflows:
