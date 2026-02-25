@@ -1,42 +1,56 @@
 version: 2.1
 
 jobs:
-  backend_build:
+  backend_ci:
     docker:
-      - image: cimg/node:18.0
-    working_directory: ~/repo
+      - image: cimg/python:3.11
+    working_directory: ~/repo/backend
     steps:
       - checkout
       - run:
-          name: Install Backend Dependencies
+          name: Install Dependencies
           command: |
-            cd backend
-            npm install
+            pip install -r requirements.txt
       - run:
-          name: Run Backend Tests
+          name: Run Tests
           command: |
-            cd backend
-            npm test || echo "No tests found"
+            pytest || echo "No tests"
 
-  frontend_build:
+  frontend_ci:
     docker:
       - image: cimg/node:18.0
-    working_directory: ~/repo
+    working_directory: ~/repo/frontend
     steps:
       - checkout
+      - run: npm install
+      - run: npm run build
+
+  deploy_to_ec2:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "SHA256:9ajH+lqwmRGo1IWNb2wwtf2IDAByxh1TxNjmmINm6DM"
       - run:
-          name: Install Frontend Dependencies
+          name: Deploy to EC2
           command: |
-            cd frontend
-            npm install
-      - run:
-          name: Build Frontend
-          command: |
-            cd frontend
-            npm run build
+            ssh -o StrictHostKeyChecking=no ec2-user@$EC2_IP "
+            if [ ! -d /home/ec2-user/blog-app ]; then
+              git clone https://github.com/MaheshKumarBisai/Blog-app.git /home/ec2-user/blog-app
+            fi &&
+            cd /home/ec2-user/blog-app && git pull origin main &&
+            npm install --prefix frontend &&
+            pip install -r backend/requirements.txt &&
+            sudo systemctl restart blog-app
+          "
 
 workflows:
-  build_workflow:
+  ci_cd_pipeline:
     jobs:
-      - backend_build
-      - frontend_build
+      - backend_ci
+      - frontend_ci
+      - deploy_to_ec2:
+          requires:
+            - backend_ci
+            - frontend_ci
