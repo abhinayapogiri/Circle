@@ -28,6 +28,7 @@ jobs:
             cd frontend
             npm install
             npm run build
+            
   deploy_to_ec2:
     docker:
       - image: cimg/base:stable
