@@ -28,6 +28,28 @@ jobs:
             cd frontend
             npm install
             npm run build
+             deploy_to_ec2:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "SHA256:mSh/McJseso+FXLGJbX0KkL5MPj88ugYOHG9jSB55J8"
+      - run:
+          name: Deploy to EC2
+          command: |
+              ssh -o StrictHostKeyChecking=no ec2-user@$EC2_IP "
+              if [ ! -d /home/ec2-user/blog-app ]; then
+                git clone https://github.com/MaheshKumarBisai/Blog-app.git /home/ec2-user/blog-app
+              fi &&
+              cd /home/ec2-user/blog-app &&
+              git pull origin main &&
+
+              cd backend && npm install && cd .. &&
+              cd frontend && npm install && npm run build && cd .. &&
+
+              pm2 restart blog-app || pm2 start backend/server.js --name blog-app
+            "
 
   
 workflows:
